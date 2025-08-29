@@ -22,11 +22,12 @@ public class BajajTestApplication implements CommandLineRunner {
 
 	@Override
 	public void run(String... args) throws Exception {
-		
+
+		// Step 1: Send POST request to generateWebhook
 		Map<String, String> requestBody = new HashMap<>();
-		requestBody.put("name", "VASANTHAKUMAR V");  // Replace with your name
-		requestBody.put("regNo", "22BEC7105"); // Replace with your regNo
-		requestBody.put("email", "vasanthakumar.22bec7105@vitapstudent.ac.in"); // Replace with your email
+		requestBody.put("name", "VASANTHAKUMAR V");
+		requestBody.put("regNo", "22BEC7105");
+		requestBody.put("email", "vasanthakumar.22bec7105@vitapstudent.ac.in");
 
 		RestTemplate restTemplate = new RestTemplate();
 
@@ -54,38 +55,54 @@ public class BajajTestApplication implements CommandLineRunner {
 		System.out.println("Received webhook: " + webhookUrl);
 		System.out.println("Received accessToken: " + accessToken);
 
-
+		// Step 2: Decide which SQL problem to solve (odd/even last 2 digits of regNo)
 		String regNo = requestBody.get("regNo");
 		String lastTwoDigitsStr = regNo.substring(regNo.length() - 2);
 		int lastTwoDigits = Integer.parseInt(lastTwoDigitsStr);
 		boolean isOdd = lastTwoDigits % 2 != 0;
 
-
 		String finalQuery;
-		if (isOdd) {
 
-			finalQuery = "SELECT p.AMOUNT AS SALARY, CONCAT(e.FIRST_NAME, ' ', e.LAST_NAME) AS NAME, EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.DOB)) AS AGE, d.DEPARTMENT_NAME FROM PAYMENTS p JOIN EMPLOYEE e ON p.EMP_ID = e.EMP_ID JOIN DEPARTMENT d ON e.DEPARTMENT = d.DEPARTMENT_ID WHERE EXTRACT(DAY FROM p.PAYMENT_TIME) != 1 ORDER BY p.AMOUNT DESC LIMIT 1;";
+		if (isOdd) {
+			// Question 1: Highest salary not on 1st day of month
+			finalQuery =
+					"SELECT p.AMOUNT AS SALARY, " +
+							"CONCAT(e.FIRST_NAME, ' ', e.LAST_NAME) AS NAME, " +
+							"EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.DOB)) AS AGE, " +
+							"d.DEPARTMENT_NAME " +
+							"FROM PAYMENTS p " +
+							"JOIN EMPLOYEE e ON p.EMP_ID = e.EMP_ID " +
+							"JOIN DEPARTMENT d ON e.DEPARTMENT = d.DEPARTMENT_ID " +
+							"WHERE EXTRACT(DAY FROM p.PAYMENT_TIME) != 1 " +
+							"ORDER BY p.AMOUNT DESC " +
+							"LIMIT 1;";
 		} else {
-			finalQuery = "SELECT * FROM your_table WHERE condition; -- Replace with actual query";
+			// Question 2: Count employees younger than each employee per department
+			finalQuery =
+					"SELECT e.EMP_ID, e.FIRST_NAME, e.LAST_NAME, d.DEPARTMENT_NAME, " +
+							"COUNT(e2.EMP_ID) AS YOUNGER_EMPLOYEES_COUNT " +
+							"FROM EMPLOYEE e " +
+							"JOIN DEPARTMENT d ON e.DEPARTMENT = d.DEPARTMENT_ID " +
+							"LEFT JOIN EMPLOYEE e2 " +
+							"ON e.DEPARTMENT = e2.DEPARTMENT " +
+							"AND e2.DOB > e.DOB " +
+							"GROUP BY e.EMP_ID, e.FIRST_NAME, e.LAST_NAME, d.DEPARTMENT_NAME " +
+							"ORDER BY e.EMP_ID DESC;";
 		}
 
-
+		// Step 3: Submit the final query
 		Map<String, String> submissionBody = new HashMap<>();
 		submissionBody.put("finalQuery", finalQuery);
 
-
-		// Set headers for submission (including Authorization)
 		HttpHeaders submissionHeaders = new HttpHeaders();
 		submissionHeaders.setContentType(MediaType.APPLICATION_JSON);
-		submissionHeaders.set("Authorization", accessToken);  // Or "Bearer " + accessToken if needed (test it)
+		submissionHeaders.set("Authorization", accessToken);
 
-		// Create entity for submission
 		HttpEntity<Map<String, String>> submissionEntity = new HttpEntity<>(submissionBody, submissionHeaders);
 
-		// Send POST to webhook URL
-		ResponseEntity<String> submissionResponse = restTemplate.exchange(webhookUrl, HttpMethod.POST, submissionEntity, String.class);
+		ResponseEntity<String> submissionResponse =
+				restTemplate.exchange(webhookUrl, HttpMethod.POST, submissionEntity, String.class);
 
-		// Print response for debugging
 		System.out.println("Submission response status: " + submissionResponse.getStatusCode());
 		System.out.println("Submission response body: " + submissionResponse.getBody());
 	}
